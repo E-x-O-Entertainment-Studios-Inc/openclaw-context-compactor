@@ -48,57 +48,41 @@ function backupConfig() {
 }
 
 async function detectModelContextWindow(config) {
-  const modelId = config?.agents?.defaults?.model?.primary;
-  if (!modelId) return null;
+  const modelConfig = config?.agents?.defaults?.model;
+  if (!modelConfig) return null;
   
-  // Parse provider/model from the model ID (e.g., "ollama/qwen2.5")
-  const [providerName, ...modelParts] = modelId.split('/');
-  const modelName = modelParts.join('/'); // e.g., "qwen2.5"
-  
-  // Look up in config's models.providers
   const providers = config?.models?.providers || {};
-  const provider = providers[providerName];
   
-  if (provider?.models) {
-    // Find the model - compare against just the model name (without provider prefix)
-    // e.g., config has id:"qwen2.5", we're looking for "ollama/qwen2.5"
-    const modelConfig = provider.models.find(m => {
-      if (!m.id) return false;
-      // Match: exact ID, or model name matches, or ID matches without provider prefix
-      return m.id === modelId || m.id === modelName || modelName.includes(m.id) || m.id.includes(modelName);
-    });
+  // Collect all model candidates: primary first, then fallbacks
+  const candidates = [];
+  if (modelConfig.primary) candidates.push(modelConfig.primary);
+  if (modelConfig.fallbacks) candidates.push(...modelConfig.fallbacks);
+  
+  // Find the first candidate that has a contextWindow defined in its provider
+  for (const modelId of candidates) {
+    if (!modelId.includes('/')) continue; // Skip if no provider prefix
     
-    if (modelConfig?.contextWindow) {
-      return { 
-        model: modelId, 
-        tokens: modelConfig.contextWindow, 
+    const [providerName, ...modelParts] = modelId.split('/');
+    const modelName = modelParts.join('/'); // e.g., "qwen2.5"
+    
+    const provider = providers[providerName];
+    if (!provider?.models) continue;
+    
+    // Find model by ID in this provider's models array
+    const found = provider.models.find(m => m.id === modelName);
+    
+    if (found?.contextWindow) {
+      return {
+        model: modelId,
+        tokens: found.contextWindow,
         source: 'config',
-        maxTokens: modelConfig.maxTokens
+        maxTokens: found.maxTokens
       };
     }
   }
   
-  // Fallback: check ALL providers for a matching model ID
-  for (const [pName, pConfig] of Object.entries(providers)) {
-    if (pConfig?.models) {
-      for (const m of pConfig.models) {
-        if (!m.id) continue;
-        // Flexible matching: model ID contains or is contained by what we're looking for
-        if (m.id === modelName || modelName.includes(m.id) || m.id.includes(modelName)) {
-          if (m.contextWindow) {
-            return {
-              model: modelId,
-              tokens: m.contextWindow,
-              source: 'config',
-              maxTokens: m.maxTokens
-            };
-          }
-        }
-      }
-    }
-  }
-  
-  // Final fallback: known defaults for common model families
+  // No contextWindow found in config - try known defaults
+  const primaryId = modelConfig.primary || '';
   const knownContexts = {
     'anthropic/claude': 200000,
     'openai/gpt-4': 128000,
@@ -106,12 +90,12 @@ async function detectModelContextWindow(config) {
   };
   
   for (const [pattern, tokens] of Object.entries(knownContexts)) {
-    if (modelId.toLowerCase().includes(pattern.toLowerCase())) {
-      return { model: modelId, tokens, source: 'fallback' };
+    if (primaryId.toLowerCase().includes(pattern.toLowerCase())) {
+      return { model: primaryId, tokens, source: 'fallback' };
     }
   }
   
-  return { model: modelId, tokens: null, source: 'unknown' };
+  return { model: primaryId, tokens: null, source: 'unknown' };
 }
 
 async function setup() {
