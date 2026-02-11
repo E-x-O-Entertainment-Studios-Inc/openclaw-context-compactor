@@ -1,6 +1,6 @@
 {
   "name": "jasper-context-compactor",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Context compaction plugin for OpenClaw - works with local models (MLX, llama.cpp) that don't report token limits",
   "main": "index.ts",
   "bin": {
