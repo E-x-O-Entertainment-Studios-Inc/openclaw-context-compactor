@@ -10,7 +10,7 @@ Local LLM servers don't report context overflow errors like cloud APIs do. OpenC
 
 ```bash
 # One command setup (installs + configures)
-npx openclaw-context-compactor setup
+npx jasper-context-compactor setup
 
 # Restart gateway
 openclaw gateway restart

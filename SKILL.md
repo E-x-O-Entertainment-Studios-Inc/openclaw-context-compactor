@@ -41,7 +41,7 @@ Context Compactor estimates tokens client-side and proactively summarizes older 
 
 ```bash
 # One command setup (recommended)
-npx openclaw-context-compactor setup
+npx jasper-context-compactor setup
 
 # Restart gateway
 openclaw gateway restart
