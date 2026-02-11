@@ -11,6 +11,7 @@ const readline = require('readline');
 
 const OPENCLAW_CONFIG = path.join(os.homedir(), '.openclaw', 'openclaw.json');
 const OPENCLAW_EXTENSIONS = path.join(os.homedir(), '.openclaw', 'extensions', 'context-compactor');
+const OLD_EXTENSIONS = path.join(os.homedir(), '.openclaw', 'extensions', 'openclaw-context-compactor');
 
 function log(msg) {
   console.log(`📦 ${msg}`);
@@ -94,6 +95,16 @@ async function setup() {
     if (fs.existsSync(src)) {
       fs.copyFileSync(src, dest);
       console.log(`  ✓ Copied: ${file}`);
+    }
+  }
+  
+  // Clean up old package name if it exists
+  if (fs.existsSync(OLD_EXTENSIONS)) {
+    try {
+      fs.rmSync(OLD_EXTENSIONS, { recursive: true });
+      console.log('  ✓ Removed old openclaw-context-compactor extension');
+    } catch (e) {
+      console.log(`  ⚠ Could not remove old extension: ${e.message}`);
     }
   }
   
