@@ -204,6 +204,11 @@ async function setup() {
   if (checkConfig.toLowerCase() === 'y' || checkConfig.toLowerCase() === 'yes') {
     detectedInfo = await detectModelContextWindow(config);
     
+    // Debug: show what we found
+    if (process.env.DEBUG) {
+      console.log('  [DEBUG] detectedInfo:', JSON.stringify(detectedInfo, null, 2));
+    }
+    
     if (detectedInfo && detectedInfo.tokens) {
       console.log('');
       console.log(`  ✓ Detected model: ${detectedInfo.model}`);
@@ -235,8 +240,8 @@ async function setup() {
     }
   }
   
-  // Manual entry if no context window was detected or user declined
-  if (!detectedInfo?.tokens || maxTokens === 16000) {
+  // Manual entry only if we couldn't detect context window at all
+  if (!detectedInfo?.tokens) {
     console.log('');
     console.log('  Could not auto-detect context window from your config.');
     console.log('');
