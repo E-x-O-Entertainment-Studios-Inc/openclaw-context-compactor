@@ -1,26 +1,64 @@
-# Context Compactor
+# Jasper Context Compactor
 
 > Token-based context compaction for OpenClaw with local models (MLX, llama.cpp, Ollama)
 
-## Why?
+## The Problem
 
-Local LLM servers don't report context overflow errors like cloud APIs do. OpenClaw's built-in compaction relies on these errors to trigger. This plugin estimates tokens client-side and proactively summarizes older messages before hitting the model's limit.
+Local LLMs don't report context overflow errors like cloud APIs do. When context gets too long, they either:
+- Silently truncate your conversation
+- Return garbage output
+- Crash without explanation
+
+OpenClaw's built-in compaction relies on error signals that local models don't provide.
+
+## The Solution
+
+Jasper Context Compactor estimates tokens client-side and proactively summarizes older messages before hitting your model's limit. No more broken conversations.
 
 ## Quick Start
 
 ```bash
-# One command setup (installs + configures)
 npx jasper-context-compactor setup
+```
 
-# Restart gateway
+**The setup will:**
+
+1. ✅ **Back up your config** — Saves `openclaw.json` to `~/.openclaw/backups/` with restore instructions
+2. ✅ **Ask permission** — Won't read your config without consent
+3. ✅ **Detect your model** — Suggests appropriate token limits based on your setup
+4. ✅ **Let you customize** — Enter your own values if auto-detection doesn't match
+5. ✅ **Update config safely** — Adds the plugin with your chosen settings
+
+Then restart OpenClaw:
+```bash
 openclaw gateway restart
 ```
 
-That's it! The setup command:
-- Copies plugin files to `~/.openclaw/extensions/context-compactor/`
-- Adds plugin config to `openclaw.json` with sensible defaults
+## Privacy
+
+🔒 **Everything runs 100% locally.** Nothing is sent to external servers.
+
+The setup only reads your local `openclaw.json` file (with your permission) to detect your model and suggest appropriate limits.
+
+## How It Works
+
+1. Before each message, estimates total context tokens (chars ÷ 4)
+2. If over `maxTokens`, splits messages into "old" and "recent"  
+3. Summarizes old messages using your session model
+4. Injects summary as context — conversation continues seamlessly
+
+## Commands
+
+After setup, use these in chat:
+
+| Command | Description |
+|---------|-------------|
+| `/context-stats` | Show current token usage and limits |
+| `/compact-now` | Clear cache and force fresh compaction |
 
 ## Configuration
+
+The setup configures these values in `~/.openclaw/openclaw.json`:
 
 ```json
 {
@@ -40,17 +78,43 @@ That's it! The setup command:
 }
 ```
 
-## Commands
+| Option | Description |
+|--------|-------------|
+| `maxTokens` | Trigger compaction above this (set to ~80% of your model's context) |
+| `keepRecentTokens` | Recent context to preserve (default: 25% of max) |
+| `summaryMaxTokens` | Max tokens for the summary (default: 12.5% of max) |
+| `charsPerToken` | Token estimation ratio (4 works for English) |
 
-- `/context-stats` — Show current token usage
-- `/compact-now` — Force fresh compaction on next message
+## Restoring Your Config
 
-## How It Works
+Setup always backs up first. To restore:
 
-1. Before each agent turn, estimates total context tokens
-2. If over `maxTokens`, splits messages into "old" and "recent"
-3. Summarizes old messages using the session model
-4. Injects summary + recent messages as context
+```bash
+# List backups
+ls ~/.openclaw/backups/
+
+# Restore (use the timestamp from your backup)
+cp ~/.openclaw/backups/openclaw-2026-02-11T08-00-00-000Z.json ~/.openclaw/openclaw.json
+
+# Restart
+openclaw gateway restart
+```
+
+## Uninstall
+
+```bash
+# Remove plugin files
+rm -rf ~/.openclaw/extensions/context-compactor
+
+# Remove from config (edit openclaw.json and delete the context-compactor entry)
+# Or restore from backup
+```
+
+## Links
+
+- **npm:** https://www.npmjs.com/package/jasper-context-compactor
+- **GitHub:** https://github.com/E-x-O-Entertainment-Studios-Inc/openclaw-context-compactor
+- **ClawHub:** https://clawhub.ai/skills/context-compactor
 
 ## License
 
