@@ -9,19 +9,16 @@ Local LLM servers don't report context overflow errors like cloud APIs do. OpenC
 ## Quick Start
 
 ```bash
-# Install
-mkdir -p ~/.openclaw/extensions/context-compactor
-curl -sL https://raw.githubusercontent.com/E-x-O-Entertainment-Studios-Inc/openclaw-context-compactor/main/index.ts \
-  -o ~/.openclaw/extensions/context-compactor/index.ts
-curl -sL https://raw.githubusercontent.com/E-x-O-Entertainment-Studios-Inc/openclaw-context-compactor/main/openclaw.plugin.json \
-  -o ~/.openclaw/extensions/context-compactor/openclaw.plugin.json
-
-# Configure (add to openclaw.json)
-# "plugins": { "entries": { "context-compactor": { "enabled": true } } }
+# One command setup (installs + configures)
+npx openclaw-context-compactor setup
 
 # Restart gateway
 openclaw gateway restart
 ```
+
+That's it! The setup command:
+- Copies plugin files to `~/.openclaw/extensions/context-compactor/`
+- Adds plugin config to `openclaw.json` with sensible defaults
 
 ## Configuration
 

@@ -1,8 +1,11 @@
 {
   "name": "openclaw-context-compactor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Context compaction plugin for OpenClaw - works with local models (MLX, llama.cpp) that don't report token limits",
   "main": "index.ts",
+  "bin": {
+    "context-compactor": "./cli.js"
+  },
   "openclaw": {
     "extensions": ["./index.ts"]
   },
@@ -24,6 +27,7 @@
     "node": ">=18.0.0"
   },
   "files": [
+    "cli.js",
     "index.ts",
     "openclaw.plugin.json",
     "SKILL.md",

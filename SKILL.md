@@ -40,14 +40,16 @@ Context Compactor estimates tokens client-side and proactively summarizes older 
 ## Installation
 
 ```bash
-# Clone to extensions
-git clone https://github.com/E-x-O-Entertainment-Studios-Inc/openclaw-context-compactor.git \
-  ~/.openclaw/extensions/context-compactor
+# One command setup (recommended)
+npx openclaw-context-compactor setup
 
-# Or copy manually
-mkdir -p ~/.openclaw/extensions/context-compactor
-cp index.ts openclaw.plugin.json ~/.openclaw/extensions/context-compactor/
+# Restart gateway
+openclaw gateway restart
 ```
+
+The setup command automatically:
+- Copies plugin files to `~/.openclaw/extensions/context-compactor/`
+- Adds plugin config to `openclaw.json` with sensible defaults
 
 ## Configuration
 
