@@ -58,9 +58,9 @@ async function detectModelContextWindow(config) {
     'openai/gpt-4': 128000,
     'openai/gpt-4-turbo': 128000,
     'openai/gpt-3.5-turbo': 16000,
-    'mlx': 8000,
-    'ollama': 8000,
-    'llama': 8000,
+    'mlx': 32000,        // Most MLX models support 32K+
+    'ollama': 32000,     // Most Ollama models support 32K+
+    'llama': 32000,
     'mistral': 32000,
     'qwen': 32000,
   };
@@ -165,7 +165,7 @@ async function setup() {
   
   const checkConfig = await prompt('  Check your config for model info? (y/n): ');
   
-  let maxTokens = 8000;
+  let maxTokens = 16000;  // OpenClaw minimum
   let detectedInfo = null;
   
   if (checkConfig.toLowerCase() === 'y' || checkConfig.toLowerCase() === 'yes') {
@@ -202,14 +202,32 @@ async function setup() {
     console.log('    • Mistral / Qwen (medium):  32,000');
     console.log('    • Claude / GPT-4 (large):   128,000+');
     console.log('');
+    console.log('  ⚠️  Minimum recommended: 16,000 tokens (OpenClaw requirement)');
+    console.log('');
     console.log('  Check your model\'s docs or LM Studio/Ollama settings.');
     console.log('  Config location: ~/.openclaw/openclaw.json');
     console.log('');
     
-    const customTokens = await prompt('  Enter maxTokens (default 8000): ');
+    const customTokens = await prompt('  Enter maxTokens (default 16000, minimum 16000): ');
     if (/^\d+$/.test(customTokens)) {
       maxTokens = parseInt(customTokens, 10);
+    } else {
+      maxTokens = 16000;
     }
+  }
+  
+  // Enforce minimum
+  const MIN_TOKENS = 16000;
+  if (maxTokens < MIN_TOKENS) {
+    console.log('');
+    console.log(`  ⚠️  Warning: ${maxTokens} tokens is below OpenClaw's minimum of ${MIN_TOKENS}.`);
+    console.log(`     Increasing to ${MIN_TOKENS} to prevent agent failures.`);
+    console.log('');
+    console.log('  If your model truly has a smaller context window, consider:');
+    console.log('    • Using a larger model (Qwen 7B+ or Mistral 7B+)');
+    console.log('    • Using the cloud fallback for complex tasks');
+    console.log('');
+    maxTokens = MIN_TOKENS;
   }
   
   // Calculate derived values
