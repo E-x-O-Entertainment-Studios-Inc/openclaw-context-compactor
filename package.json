@@ -1,0 +1,32 @@
+{
+  "name": "openclaw-context-compactor",
+  "version": "0.1.0",
+  "description": "Context compaction plugin for OpenClaw - works with local models (MLX, llama.cpp) that don't report token limits",
+  "main": "index.ts",
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  },
+  "keywords": [
+    "openclaw",
+    "context",
+    "compaction",
+    "mlx",
+    "local-llm",
+    "token-limit"
+  ],
+  "author": "E.x.O. Entertainment Studios Inc.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/E-x-O-Entertainment-Studios-Inc/openclaw-context-compactor.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "index.ts",
+    "openclaw.plugin.json",
+    "SKILL.md",
+    "README.md"
+  ]
+}
