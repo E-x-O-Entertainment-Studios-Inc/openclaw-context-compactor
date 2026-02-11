@@ -48,12 +48,42 @@ function backupConfig() {
 }
 
 // Local model providers that benefit from context compaction
-const LOCAL_PROVIDERS = ['ollama', 'lmstudio', 'llamacpp', 'mlx', 'friend-gpu', 'openrouter'];
+const LOCAL_PROVIDER_NAMES = ['ollama', 'lmstudio', 'llamacpp', 'mlx', 'friend-gpu', 'openrouter'];
 
-function isLocalProvider(providerId) {
+// URLs that indicate local/Ollama endpoints
+const LOCAL_URL_PATTERNS = [
+  ':11434',           // Ollama default port
+  'localhost',
+  '127.0.0.1',
+  '0.0.0.0',
+  /100\.\d+\.\d+\.\d+/,  // Tailscale
+  /192\.168\.\d+\.\d+/,  // Local network
+  /10\.\d+\.\d+\.\d+/,   // Private network
+];
+
+function isLocalProvider(providerId, providers = {}) {
   if (!providerId) return false;
   const lower = providerId.toLowerCase();
-  return LOCAL_PROVIDERS.some(p => lower.includes(p));
+  
+  // Check provider name
+  if (LOCAL_PROVIDER_NAMES.some(p => lower.includes(p))) {
+    return true;
+  }
+  
+  // Check provider's baseUrl for local patterns
+  const provider = providers[providerId];
+  if (provider?.baseUrl) {
+    const url = provider.baseUrl.toLowerCase();
+    for (const pattern of LOCAL_URL_PATTERNS) {
+      if (pattern instanceof RegExp) {
+        if (pattern.test(url)) return true;
+      } else {
+        if (url.includes(pattern)) return true;
+      }
+    }
+  }
+  
+  return false;
 }
 
 async function detectModelContextWindow(config) {
@@ -78,8 +108,8 @@ async function detectModelContextWindow(config) {
     const [providerName, ...modelParts] = modelId.split('/');
     const modelName = modelParts.join('/'); // e.g., "qwen2.5"
     
-    // Check if this is a local provider
-    if (isLocalProvider(providerName)) {
+    // Check if this is a local provider (by name or baseUrl)
+    if (isLocalProvider(providerName, providers)) {
       hasLocalModel = true;
       
       const provider = providers[providerName];
@@ -251,15 +281,6 @@ async function setup() {
       console.log('  Local models (Ollama, llama.cpp, MLX, LM Studio) don\'t report');
       console.log('  context overflow errors — they silently truncate or produce garbage.');
       console.log('  This plugin is HIGHLY recommended for your setup.');
-    } else if (detectedInfo?.model) {
-      // Cloud-only config
-      const providerName = detectedInfo.model.split('/')[0] || '';
-      if (['anthropic', 'openai', 'google'].includes(providerName.toLowerCase())) {
-        console.log('');
-        console.log('  ℹ️  Cloud-only config detected (no local models).');
-        console.log('     Cloud APIs report context limits properly, so this plugin');
-        console.log('     is less critical — but can still help with token costs.');
-      }
     }
     
     if (detectedInfo && detectedInfo.tokens) {
