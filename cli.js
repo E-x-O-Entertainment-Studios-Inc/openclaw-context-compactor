@@ -51,19 +51,22 @@ async function detectModelContextWindow(config) {
   const modelId = config?.agents?.defaults?.model?.primary;
   if (!modelId) return null;
   
-  // Parse provider/model from the model ID (e.g., "anthropic/claude-opus-4-5")
+  // Parse provider/model from the model ID (e.g., "ollama/qwen2.5")
   const [providerName, ...modelParts] = modelId.split('/');
-  const modelName = modelParts.join('/');
+  const modelName = modelParts.join('/'); // e.g., "qwen2.5"
   
   // Look up in config's models.providers
   const providers = config?.models?.providers || {};
   const provider = providers[providerName];
   
   if (provider?.models) {
-    // Find the model in the provider's models array
-    const modelConfig = provider.models.find(m => 
-      m.id === modelName || m.id === modelId
-    );
+    // Find the model - compare against just the model name (without provider prefix)
+    // e.g., config has id:"qwen2.5", we're looking for "ollama/qwen2.5"
+    const modelConfig = provider.models.find(m => {
+      if (!m.id) return false;
+      // Match: exact ID, or model name matches, or ID matches without provider prefix
+      return m.id === modelId || m.id === modelName || modelName.includes(m.id) || m.id.includes(modelName);
+    });
     
     if (modelConfig?.contextWindow) {
       return { 
@@ -75,17 +78,21 @@ async function detectModelContextWindow(config) {
     }
   }
   
-  // Fallback: check for ollama models with contextWindow in the config
+  // Fallback: check ALL providers for a matching model ID
   for (const [pName, pConfig] of Object.entries(providers)) {
     if (pConfig?.models) {
       for (const m of pConfig.models) {
-        if (m.id && modelId.includes(m.id) && m.contextWindow) {
-          return {
-            model: modelId,
-            tokens: m.contextWindow,
-            source: 'config',
-            maxTokens: m.maxTokens
-          };
+        if (!m.id) continue;
+        // Flexible matching: model ID contains or is contained by what we're looking for
+        if (m.id === modelName || modelName.includes(m.id) || m.id.includes(modelName)) {
+          if (m.contextWindow) {
+            return {
+              model: modelId,
+              tokens: m.contextWindow,
+              source: 'config',
+              maxTokens: m.maxTokens
+            };
+          }
         }
       }
     }
