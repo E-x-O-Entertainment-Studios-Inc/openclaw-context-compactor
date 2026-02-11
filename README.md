@@ -25,9 +25,20 @@ npx jasper-context-compactor setup
 
 1. ✅ **Back up your config** — Saves `openclaw.json` to `~/.openclaw/backups/` with restore instructions
 2. ✅ **Ask permission** — Won't read your config without consent
-3. ✅ **Detect your model** — Suggests appropriate token limits based on your setup
-4. ✅ **Let you customize** — Enter your own values if auto-detection doesn't match
-5. ✅ **Update config safely** — Adds the plugin with your chosen settings
+3. ✅ **Detect local models** — Automatically identifies Ollama, llama.cpp, MLX, LM Studio providers
+4. ✅ **Suggest token limits** — Based on your model's contextWindow from config
+5. ✅ **Let you customize** — Enter your own values if auto-detection doesn't match
+6. ✅ **Update config safely** — Adds the plugin with your chosen settings
+
+### Supported Local Providers
+
+The setup automatically detects these providers (primary or fallback):
+- **Ollama** — `/ollama` endpoint
+- **llama.cpp** — llamacpp provider
+- **MLX** — mlx provider  
+- **LM Studio** — lmstudio provider
+- **friend-gpu** — Custom GPU servers
+- **OpenRouter** — When routing to local models
 
 Then restart OpenClaw:
 ```bash

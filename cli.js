@@ -47,6 +47,15 @@ function backupConfig() {
   return backupPath;
 }
 
+// Local model providers that benefit from context compaction
+const LOCAL_PROVIDERS = ['ollama', 'lmstudio', 'llamacpp', 'mlx', 'friend-gpu', 'openrouter'];
+
+function isLocalProvider(providerId) {
+  if (!providerId) return false;
+  const lower = providerId.toLowerCase();
+  return LOCAL_PROVIDERS.some(p => lower.includes(p));
+}
+
 async function detectModelContextWindow(config) {
   const modelConfig = config?.agents?.defaults?.model;
   if (!modelConfig) return null;
@@ -58,12 +67,34 @@ async function detectModelContextWindow(config) {
   if (modelConfig.primary) candidates.push(modelConfig.primary);
   if (modelConfig.fallbacks) candidates.push(...modelConfig.fallbacks);
   
+  // Track if any local models are in the chain
+  let hasLocalModel = false;
+  let localModelInfo = null;
+  
   // Find the first candidate that has a contextWindow defined in its provider
   for (const modelId of candidates) {
     if (!modelId.includes('/')) continue; // Skip if no provider prefix
     
     const [providerName, ...modelParts] = modelId.split('/');
     const modelName = modelParts.join('/'); // e.g., "qwen2.5"
+    
+    // Check if this is a local provider
+    if (isLocalProvider(providerName)) {
+      hasLocalModel = true;
+      
+      const provider = providers[providerName];
+      const found = provider?.models?.find(m => m.id === modelName);
+      
+      if (!localModelInfo || found?.contextWindow) {
+        localModelInfo = {
+          model: modelId,
+          tokens: found?.contextWindow || null,
+          source: found?.contextWindow ? 'config' : 'unknown',
+          maxTokens: found?.maxTokens,
+          isLocal: true
+        };
+      }
+    }
     
     const provider = providers[providerName];
     if (!provider?.models) continue;
@@ -76,9 +107,19 @@ async function detectModelContextWindow(config) {
         model: modelId,
         tokens: found.contextWindow,
         source: 'config',
-        maxTokens: found.maxTokens
+        maxTokens: found.maxTokens,
+        hasLocalModel,
+        localModelInfo
       };
     }
+  }
+  
+  // If we have local model info but no contextWindow from config, return that
+  if (localModelInfo) {
+    return {
+      ...localModelInfo,
+      hasLocalModel: true
+    };
   }
   
   // No contextWindow found in config - try known defaults
@@ -91,11 +132,11 @@ async function detectModelContextWindow(config) {
   
   for (const [pattern, tokens] of Object.entries(knownContexts)) {
     if (primaryId.toLowerCase().includes(pattern.toLowerCase())) {
-      return { model: primaryId, tokens, source: 'fallback' };
+      return { model: primaryId, tokens, source: 'fallback', hasLocalModel };
     }
   }
   
-  return { model: primaryId, tokens: null, source: 'unknown' };
+  return { model: primaryId, tokens: null, source: 'unknown', hasLocalModel };
 }
 
 async function setup() {
@@ -198,6 +239,27 @@ async function setup() {
     // Debug: show what we found
     if (process.env.DEBUG) {
       console.log('  [DEBUG] detectedInfo:', JSON.stringify(detectedInfo, null, 2));
+    }
+    
+    // Show local model recommendation
+    if (detectedInfo?.hasLocalModel || detectedInfo?.isLocal) {
+      console.log('');
+      console.log('  🎯 Local model detected in your config!');
+      const localModel = detectedInfo.localModelInfo?.model || detectedInfo.model;
+      console.log(`     → ${localModel}`);
+      console.log('');
+      console.log('  Local models (Ollama, llama.cpp, MLX, LM Studio) don\'t report');
+      console.log('  context overflow errors — they silently truncate or produce garbage.');
+      console.log('  This plugin is HIGHLY recommended for your setup.');
+    } else if (detectedInfo?.model) {
+      // Cloud-only config
+      const providerName = detectedInfo.model.split('/')[0] || '';
+      if (['anthropic', 'openai', 'google'].includes(providerName.toLowerCase())) {
+        console.log('');
+        console.log('  ℹ️  Cloud-only config detected (no local models).');
+        console.log('     Cloud APIs report context limits properly, so this plugin');
+        console.log('     is less critical — but can still help with token costs.');
+      }
     }
     
     if (detectedInfo && detectedInfo.tokens) {
