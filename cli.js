@@ -48,30 +48,63 @@ function backupConfig() {
 }
 
 async function detectModelContextWindow(config) {
-  const model = config?.agents?.defaults?.model?.primary;
-  if (!model) return null;
+  const modelId = config?.agents?.defaults?.model?.primary;
+  if (!modelId) return null;
   
-  const knownContexts = {
-    'anthropic/claude-opus': 200000,
-    'anthropic/claude-sonnet': 200000,
-    'anthropic/claude-haiku': 200000,
-    'openai/gpt-4': 128000,
-    'openai/gpt-4-turbo': 128000,
-    'openai/gpt-3.5-turbo': 16000,
-    'mlx': 32000,        // Most MLX models support 32K+
-    'ollama': 32000,     // Most Ollama models support 32K+
-    'llama': 32000,
-    'mistral': 32000,
-    'qwen': 32000,
-  };
+  // Parse provider/model from the model ID (e.g., "anthropic/claude-opus-4-5")
+  const [providerName, ...modelParts] = modelId.split('/');
+  const modelName = modelParts.join('/');
   
-  for (const [pattern, tokens] of Object.entries(knownContexts)) {
-    if (model.toLowerCase().includes(pattern.toLowerCase())) {
-      return { model, tokens, source: 'detected' };
+  // Look up in config's models.providers
+  const providers = config?.models?.providers || {};
+  const provider = providers[providerName];
+  
+  if (provider?.models) {
+    // Find the model in the provider's models array
+    const modelConfig = provider.models.find(m => 
+      m.id === modelName || m.id === modelId
+    );
+    
+    if (modelConfig?.contextWindow) {
+      return { 
+        model: modelId, 
+        tokens: modelConfig.contextWindow, 
+        source: 'config',
+        maxTokens: modelConfig.maxTokens
+      };
     }
   }
   
-  return { model, tokens: null, source: 'unknown' };
+  // Fallback: check for ollama models with contextWindow in the config
+  for (const [pName, pConfig] of Object.entries(providers)) {
+    if (pConfig?.models) {
+      for (const m of pConfig.models) {
+        if (m.id && modelId.includes(m.id) && m.contextWindow) {
+          return {
+            model: modelId,
+            tokens: m.contextWindow,
+            source: 'config',
+            maxTokens: m.maxTokens
+          };
+        }
+      }
+    }
+  }
+  
+  // Final fallback: known defaults for common model families
+  const knownContexts = {
+    'anthropic/claude': 200000,
+    'openai/gpt-4': 128000,
+    'openai/gpt-3.5': 16000,
+  };
+  
+  for (const [pattern, tokens] of Object.entries(knownContexts)) {
+    if (modelId.toLowerCase().includes(pattern.toLowerCase())) {
+      return { model: modelId, tokens, source: 'fallback' };
+    }
+  }
+  
+  return { model: modelId, tokens: null, source: 'unknown' };
 }
 
 async function setup() {
@@ -174,45 +207,53 @@ async function setup() {
     if (detectedInfo && detectedInfo.tokens) {
       console.log('');
       console.log(`  ✓ Detected model: ${detectedInfo.model}`);
-      console.log(`  ✓ Context window: ~${detectedInfo.tokens.toLocaleString()} tokens`);
+      console.log(`  ✓ Context window: ${detectedInfo.tokens.toLocaleString()} tokens (from ${detectedInfo.source})`);
       
-      const suggested = Math.floor(detectedInfo.tokens * 0.8);
-      console.log(`  → Suggested maxTokens: ${suggested.toLocaleString()} (80% of context)`);
+      // Use the actual contextWindow, apply minimum
+      let suggested = detectedInfo.tokens;
+      if (suggested < 16000) {
+        console.log(`  ⚠ Model context (${suggested}) is below OpenClaw minimum (16000)`);
+        console.log(`  → Will use 16,000 tokens to prevent agent failures`);
+        suggested = 16000;
+      }
       console.log('');
       
       const useDetected = await prompt(`  Use ${suggested.toLocaleString()} tokens? (y/n, or enter custom): `);
       
-      if (useDetected.toLowerCase() === 'y' || useDetected.toLowerCase() === 'yes') {
+      if (useDetected.toLowerCase() === 'y' || useDetected.toLowerCase() === 'yes' || useDetected === '') {
         maxTokens = suggested;
       } else if (/^\d+$/.test(useDetected)) {
         maxTokens = parseInt(useDetected, 10);
+      } else {
+        maxTokens = suggested; // Default to suggested on invalid input
       }
     } else if (detectedInfo && detectedInfo.model) {
       console.log('');
       console.log(`  ⚠ Found model: ${detectedInfo.model}`);
-      console.log('  ⚠ Could not determine context window automatically.');
+      console.log('  ⚠ No contextWindow defined in your config for this model.');
+      console.log('  💡 Add contextWindow to your model config in openclaw.json');
     }
   }
   
-  // Manual entry if needed
-  if (maxTokens === 8000 && (!detectedInfo || !detectedInfo.tokens)) {
+  // Manual entry if no context window was detected or user declined
+  if (!detectedInfo?.tokens || maxTokens === 16000) {
+    console.log('');
+    console.log('  Could not auto-detect context window from your config.');
     console.log('');
     console.log('  Common context windows:');
-    console.log('    • MLX / llama.cpp (small):  4,000 - 8,000');
-    console.log('    • Mistral / Qwen (medium):  32,000');
-    console.log('    • Claude / GPT-4 (large):   128,000+');
+    console.log('    • Ollama / llama.cpp (small): 8,000 - 16,000');
+    console.log('    • Mistral / Qwen (medium):    32,000');
+    console.log('    • Claude / GPT-4 (large):     128,000+');
     console.log('');
-    console.log('  ⚠️  Minimum recommended: 16,000 tokens (OpenClaw requirement)');
+    console.log('  💡 Tip: Check your model config in ~/.openclaw/openclaw.json');
+    console.log('     Look for: models.providers.<provider>.models[].contextWindow');
     console.log('');
-    console.log('  Check your model\'s docs or LM Studio/Ollama settings.');
-    console.log('  Config location: ~/.openclaw/openclaw.json');
+    console.log('  ⚠️  Minimum: 16,000 tokens (OpenClaw requirement)');
     console.log('');
     
     const customTokens = await prompt('  Enter maxTokens (default 16000, minimum 16000): ');
     if (/^\d+$/.test(customTokens)) {
       maxTokens = parseInt(customTokens, 10);
-    } else {
-      maxTokens = 16000;
     }
   }
   
